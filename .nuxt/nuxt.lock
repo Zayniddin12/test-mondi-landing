@@ -1,0 +1,9 @@
+{
+  "pid": 14576,
+  "startedAt": 1793114850043,
+  "command": "dev",
+  "cwd": "/Users/zayniddin0905icloud.com/WebstormProjects/mondi-landing-page/frontend",
+  "port": 3000,
+  "hostname": "::1",
+  "url": "http://[::1]:3000"
+}
