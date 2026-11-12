@@ -4,6 +4,7 @@ import '~/assets/main.css'
 type Item = { id: string; category: string; name: string; desc: string; price: number; emoji: string }
 type Cat = { id: string; title: string }
 
+const { data: payMethods } = await useFetch<{ methods: { code: string; name: string; type: string }[] }>('/api/payment-methods')
 const { data: menu, error: menuError } = await useFetch<{ categories: Cat[]; items: Item[] }>('/api/menu')
 
 const activeCat = ref('all')
@@ -27,7 +28,7 @@ const money = (n: number) => n.toLocaleString('ru-RU') + " so'm"
 
 // --- buyurtma formasi ---
 const showCart = ref(false)
-const form = reactive({ name: '', phone: '+998', address: '', district: '', note: '', payment: 'Naqd' })
+const form = reactive({ name: '', phone: '+998', address: '', district: '', note: '', payment: 'naqd' })
 const coords = ref<{ lat: number; lng: number } | null>(null)
 const geoMsg = ref('')
 const quote = ref<{ delivery_fee: number; distance_km: number; eta_min: number } | null>(null)
@@ -72,6 +73,8 @@ async function submit() {
         },
         items: lines.value.map((l) => ({ id: l.id, qty: l.qty })),
         payment_method: form.payment,
+        return_url: location.origin + '/?order={ID}',
+        return_error_url: location.origin + '/?order={ID}&failed=1',
         note: form.note.trim() || undefined,
       },
     })
@@ -79,6 +82,11 @@ async function submit() {
     status.value = res
     showCart.value = false
     Object.keys(cart).forEach((k) => delete cart[k])
+    if (res.payment?.pay_url) {
+      try { sessionStorage.setItem('mondi_order', res.external_id) } catch {}
+      location.href = res.payment.pay_url // Multicard / ilova to'lov sahifasiga
+      return
+    }
     startPolling()
   } catch (e: any) {
     const d = e?.data?.detail
@@ -94,13 +102,45 @@ function startPolling() {
   clearInterval(timer)
   const tick = async () => {
     try {
-      status.value = await $fetch(`/api/orders/${order.value.external_id}`)
+      const [st, pay]: any[] = await Promise.all([
+        $fetch(`/api/orders/${order.value.external_id}`),
+        status.value?.pay_status === 'paid' || form.payment === 'naqd' ? null : $fetch(`/api/orders/${order.value.external_id}/payment`),
+      ])
+      status.value = { ...st, payment: pay?.payment ?? status.value?.payment }
       if (['delivered', 'cancelled'].includes(status.value.status)) clearInterval(timer)
     } catch {}
   }
   timer = setInterval(tick, 15000)
   tick()
 }
+
+// to'lov havolasini qayta olish / usulni almashtirish
+const payMethod = ref('')
+async function pay() {
+  errorMsg.value = ''
+  try {
+    const r: any = await $fetch(`/api/orders/${order.value.external_id}/pay`, {
+      method: 'POST',
+      body: {
+        method: payMethod.value || payMethods.value?.methods?.[0]?.code,
+        return_url: location.origin + `/?order=${order.value.external_id}`,
+        return_error_url: location.origin + `/?order=${order.value.external_id}&failed=1`,
+      },
+    })
+    if (r.pay_url) location.href = r.pay_url
+  } catch (e: any) {
+    errorMsg.value = e?.data?.detail || 'To‘lov havolasini olib bo‘lmadi'
+  }
+}
+
+// to'lovdan qaytgach (?order=ID) kuzatuvni davom ettirish
+onMounted(() => {
+  const id = (useRoute().query.order as string) || ''
+  if (!id) return
+  order.value = { external_id: id }
+  startPolling()
+  history.replaceState(null, '', location.pathname)
+})
 
 async function cancel() {
   try {
@@ -116,6 +156,9 @@ const newOrder = () => {
 }
 onBeforeUnmount(() => clearInterval(timer))
 
+const payLabel = computed(() =>
+  ({ paid: "to'langan", pending: "to'lov kutilmoqda" } as Record<string, string>)[status.value?.pay_status] ?? status.value?.pay_status,
+)
 const steps = ['new', 'assigned', 'onway', 'delivered']
 const stepIdx = computed(() => steps.indexOf(status.value?.status))
 const total = computed(() => subtotal.value + (quote.value?.delivery_fee ?? 0))
@@ -147,7 +190,13 @@ const total = computed(() => subtotal.value + (quote.value?.delivery_fee ?? 0))
       </ol>
       <p v-if="status?.courier">Kuryer: <b>{{ status.courier.name }}</b>, {{ status.courier.phone }}<span v-if="status.eta_min"> · ~{{ status.eta_min }} daqiqa</span></p>
       <p v-if="status?.cancel_reason">Sabab: {{ status.cancel_reason }}</p>
-      <p class="muted">Taomlar: {{ money(status?.subtotal ?? 0) }} · Yetkazish: {{ money(status?.delivery_fee ?? 0) }} · <b>Jami: {{ money(status?.total ?? 0) }}</b> ({{ status?.pay_status }})</p>
+      <p class="muted">Taomlar: {{ money(status?.subtotal ?? 0) }} · Yetkazish: {{ money(status?.delivery_fee ?? 0) }} · <b>Jami: {{ money(status?.total ?? 0) }}</b> ({{ payLabel }})</p>
+      <div v-if="status?.pay_status === 'pending' && status?.status !== 'cancelled'" class="pay-box">
+        <p class="err" v-if="status?.payment?.status === 'expired'">To'lov havolasi muddati tugadi.</p>
+        <p class="muted">To'lov kutilmoqda — to'lamaguncha kuryer qidirilmaydi.</p>
+        <select v-model="payMethod"><option v-for="m in payMethods?.methods" :key="m.code" :value="m.code">{{ m.name }}</option></select>
+        <button class="primary" @click="pay">To'lash</button>
+      </div>
       <p v-if="errorMsg" class="err">{{ errorMsg }}</p>
       <div class="row">
         <button v-if="['new', 'assigned'].includes(status?.status)" class="ghost" @click="cancel">Bekor qilish</button>
@@ -201,9 +250,12 @@ const total = computed(() => subtotal.value + (quote.value?.delivery_fee ?? 0))
         <div class="row"><button type="button" class="ghost sm" @click="locate">📍 Joylashuvimni aniqlash</button><span class="muted">{{ geoMsg }}</span></div>
         <label>Kuryerga izoh<input v-model="form.note" maxlength="500" placeholder="Domofon ishlamaydi…" /></label>
         <label>To'lov usuli
-          <select v-model="form.payment"><option>Naqd</option><option>Karta</option><option>Payme</option><option>Click</option></select>
+          <select v-model="form.payment">
+            <option value="naqd">Naqd (kuryerga)</option>
+            <option v-for="m in payMethods?.methods" :key="m.code" :value="m.code">{{ m.name }}</option>
+          </select>
         </label>
-        <p v-if="form.payment !== 'Naqd'" class="muted">Test rejimi: onlayn to'lov simulyatsiya qilinadi (to'langan deb yuboriladi).</p>
+        <p v-if="form.payment !== 'naqd'" class="muted">Buyurtmadan so'ng to'lov sahifasiga o'tasiz. To'lov tushgach kuryer qidiruvi boshlanadi.</p>
 
         <div class="sum">
           <div class="row between"><span>Taomlar</span><span>{{ money(subtotal) }}</span></div>
