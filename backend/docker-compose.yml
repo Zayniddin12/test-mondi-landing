@@ -4,8 +4,5 @@ services:
     container_name: mondi-backend
     restart: unless-stopped
     env_file: .env
-    networks: [web]
-networks:
-  web:
-    name: minor-parking_web
-    external: true
+    ports:
+      - "8100:8100"
