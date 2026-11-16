@@ -8,7 +8,7 @@ CATEGORIES = [
 ]
 
 ITEMS = [
-    {"id": "espresso", "category": "coffee", "name": "Espresso", "desc": "Kuchli, quyuq, 30 ml", "price": 18000, "emoji": "☕"},
+    {"id": "espresso", "category": "coffee", "name": "Espresso", "desc": "Kuchli, quyuq, 30 ml", "price": 500, "emoji": "☕"},
     {"id": "cappuccino", "category": "coffee", "name": "Kapuchino", "desc": "Espresso va ko'pikli sut", "price": 25000, "emoji": "☕"},
     {"id": "latte", "category": "coffee", "name": "Latte", "desc": "Yumshoq sutli qahva", "price": 27000, "emoji": "🥛"},
     {"id": "raf", "category": "coffee", "name": "Raf qahva", "desc": "Qaymoq va vanil bilan", "price": 32000, "emoji": "☕"},
