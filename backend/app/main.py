@@ -119,8 +119,8 @@ async def create_order(order: OrderIn):
                 payload["payment"][key] = val.replace("{ID}", external_id)
     if order.note:
         payload["note"] = order.note
-    if order.address.lat is None or order.address.lng is None:
-        payload["delivery_fee"] = settings.default_delivery_fee  # koordinata yo'q bo'lsa majburiy
+    # Yetkazish haqi mijozdan olinmaydi: faqat taomlar narxi to'lanadi
+    payload["delivery_fee"] = 0
 
     try:
         status, body = await yolda.call("POST", "/orders", json=payload)
