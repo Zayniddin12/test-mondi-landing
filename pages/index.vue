@@ -161,7 +161,7 @@ const payLabel = computed(() =>
 )
 const steps = ['new', 'assigned', 'onway', 'delivered']
 const stepIdx = computed(() => steps.indexOf(status.value?.status))
-const total = computed(() => subtotal.value + (quote.value?.delivery_fee ?? 0))
+const total = computed(() => subtotal.value)
 </script>
 
 <template>
@@ -190,7 +190,7 @@ const total = computed(() => subtotal.value + (quote.value?.delivery_fee ?? 0))
       </ol>
       <p v-if="status?.courier">Kuryer: <b>{{ status.courier.name }}</b>, {{ status.courier.phone }}<span v-if="status.eta_min"> · ~{{ status.eta_min }} daqiqa</span></p>
       <p v-if="status?.cancel_reason">Sabab: {{ status.cancel_reason }}</p>
-      <p class="muted">Taomlar: {{ money(status?.subtotal ?? 0) }} · Yetkazish: {{ money(status?.delivery_fee ?? 0) }} · <b>Jami: {{ money(status?.total ?? 0) }}</b> ({{ payLabel }})</p>
+      <p class="muted">Taomlar: {{ money(status?.subtotal ?? 0) }} · <b>Jami: {{ money(status?.subtotal ?? 0) }}</b> ({{ payLabel }})</p>
       <div v-if="status?.pay_status === 'pending' && status?.status !== 'cancelled'" class="pay-box">
         <p class="err" v-if="status?.payment?.status === 'expired'">To'lov havolasi muddati tugadi.</p>
         <p class="muted">To'lov kutilmoqda — to'lamaguncha kuryer qidirilmaydi.</p>
@@ -259,9 +259,8 @@ const total = computed(() => subtotal.value + (quote.value?.delivery_fee ?? 0))
 
         <div class="sum">
           <div class="row between"><span>Taomlar</span><span>{{ money(subtotal) }}</span></div>
-          <div class="row between"><span>Yetkazish</span><span>{{ quote ? money(quote.delivery_fee) : 'Yo\'lda hisoblaydi' }}</span></div>
           <div v-if="quote" class="row between muted"><span>{{ quote.distance_km }} km</span><span>~{{ quote.eta_min }} daqiqa</span></div>
-          <div class="row between"><b>Jami</b><b>{{ quote ? money(total) : money(subtotal) + ' +' }}</b></div>
+          <div class="row between"><b>Jami</b></div>
         </div>
         <p v-if="errorMsg" class="err">{{ errorMsg }}</p>
         <button class="primary full" :disabled="sending">{{ sending ? 'Yuborilmoqda…' : 'Buyurtma berish' }}</button>
