@@ -4,6 +4,7 @@ services:
     container_name: mondi-backend
     restart: unless-stopped
     env_file: .env
+    dns: [8.8.8.8, 1.1.1.1]  # sslip.io (Yo'lda) manzilini hal qilish uchun
     networks: [web]
 networks:
   web:
